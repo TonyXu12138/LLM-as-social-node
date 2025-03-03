@@ -27,9 +27,11 @@ def main(ds, domain,  group_name, group, resume = False):
         ##resume from break point, recover index, correct and split data
         pre_data_index = pre_result_len*100
         correct = ceil(result_lst[-1]*pre_data_index)
-        ds_domain = ds_domain.select(range(pre_data_index,len(ds_domain)))
+        # ds_domain = ds_domain.select(range(pre_data_index,len(ds_domain)))
     ###question preparation
     for question_id, row in tqdm(enumerate(ds_domain),total = len(ds_domain)):
+        if question_id < pre_data_index:
+            continue
         answer_lst = []
         question,options,label = row['question'],row['options'],row['answer_index']
         for option_id, option in enumerate(options):
