@@ -6,17 +6,20 @@ import json
 import argparse
 from utils import generate_template, answer_extraction
 from math import ceil
+import time
 from volcenginesdkarkruntime import Ark
+import volcenginesdkarkruntime
 # from utils import class_6_lst, law_6_lst, Fina_6_lst,med_6_lst
-from role_description import class_6_lst,law_6_lst, Fina_6_lst,med_6_lst
+from role_description import class_6_lst, law_3_lst, law_6_lst, law_10_lst, Fina_6_lst,med_6_lst
 
-def main(ds, domain,  group_name, group, resume = False):
+def main(ds, domain,  group_name, group, size,resume = False):
     ds_domain = ds.filter(lambda x: x['category'] == domain)
     result_lst = []
     total_answer_lst = []
     correct = 0
-    result_path = result_path_prefix + f'{domain}_{group_name}.json'
-    answer_path = result_path_prefix + f'{domain}_{group_name}_answer.json'
+    result_path = result_path_prefix + f'{domain}_{group_name}_{size}.json'
+    answer_path = result_path_prefix + f'{domain}_{group_name}_{size}_answer.json'
+    pre_data_index = 0
     if resume == True:
         with open(result_path,'r') as f:
             pre_result = json.load(f)
@@ -55,10 +58,17 @@ def main(ds, domain,  group_name, group, resume = False):
                             The rationale of the answer is {ans["agent_answer"]} \n'    
                                         
             messages = generate_template(role_resp_lst = group, message_hist = message_hist, turn = id, problem = question, mode = 'RR')
-            output = client.chat.completions.create(
-                                model="ep-20250227211204-2dsf9",
-                                messages=messages,
-                        )              
+            generation = True
+            while generation:
+                try:
+                    output = client.chat.completions.create(
+                                        model="ep-20250227211204-2dsf9",
+                                        messages=messages,
+                                )          
+                    generation = False
+                except volcenginesdkarkruntime._exceptions.ArkRateLimitError:
+                    time.sleep(1)
+                    
             if hasattr(output.choices[0].message, 'reasoning_content'):
                 reasoning_steps = output.choices[0].message.reasoning_content
             else:
@@ -78,10 +88,10 @@ def main(ds, domain,  group_name, group, resume = False):
     print(f'{domain} {id} done')
     
     
-group_lst = [class_6_lst,law_6_lst, Fina_6_lst,med_6_lst]
+group_lst_dict = [{6:class_6_lst},{3:law_3_lst,6:law_6_lst,10:law_10_lst}, {6:Fina_6_lst},{6:med_6_lst}]
 group_str_lst = ['class','law','Fina','Med']
-group_dict = dict(zip(group_str_lst,group_lst))
-domain_lst = ['math','law','finance','health','other'] #'engineering'
+group_dict = dict(zip(group_str_lst,group_lst_dict))
+domain_lst = ['math','law','business','health','other'] #'engineering'
 domain_lst = ['math']
 result_path_prefix = './result/MMLU_Pro_Llama_r1_8b/'
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -97,10 +107,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
     # Add arguments
-    parser.add_argument("--domain", type=str, help="domain name",choices=['math','law','finance','health','other'], required=True)
+    parser.add_argument("--domain", type=str, help="domain name",choices=['math','law','business','health','other'], required=True)
     parser.add_argument("--group", type=str, help="group name",choices=['class','law','Fina','Med'], required=True)
+    parser.add_argument("--size", type=int, help="group size", choices = [3,6,10], required=True)
     parser.add_argument("--resume", type=bool, help="resume from break point", default = False)
     # Parse arguments
     args = parser.parse_args()
     
-    main(ds, args.domain, args.group, group_dict[args.group],args.resume)
+    
+    main(ds, args.domain, args.group, group_dict[args.group][args.size],args.size,args.resume)
